@@ -8,7 +8,7 @@ with open("apicode.json") as apc:
 	apicode = json.load(apc)[0]["apicode"]
 
 api = OsuApi(apicode, connector = ReqConnector())
-playername = "Xav"
+playername = "neil123"
 user = api.get_user(playername) 
 
 def compare_maps(a, b):
@@ -85,9 +85,11 @@ for player in similar_users:
 
 results = api.get_user_best(playername, limit=25)
 userscores = []
+scoreidonly = []
 for x in results:
 	score = str(x.beatmap_id) + " " + str(x.enabled_mods)
-	userscores.append(score)	
+	userscores.append(score)
+	scoreidonly.append(str(x.beatmap_id))	
 
 bestfriends = []
 affinities = {}
@@ -117,8 +119,8 @@ for bestfriend in bestfriends:
 			mapcounts[playerscores[i].split(" ")[0]] = 1
 			modcounter[playerscores[i].split(" ")[0]] = {"NoMod" : 0, "HardRock" : 0, "DoubleTime" : 0}
 		mod_finder(playerscores[i], modcounter) 		 
-	dump = []
-for x in sorted(mapcounts, key=mapcounts.__getitem__):
+dump = []
+for x in sorted(mapcounts, key=mapcounts.__getitem__, reverse = True):
 	dump.append(x)
 
 
@@ -129,6 +131,8 @@ for i in range(100):
 	c.execute("CREATE TABLE IF NOT EXISTS BEATMAPS(BEATMAP_ID INTEGER,TITLE TEXT,LINK TEXT,CREATOR TEXT)")
 	try:
 		map = dump[i].split(" ")
+		if map[0] in scoreidonly:
+			continue
 	except:
 		pass
 	c.execute("SELECT * FROM BEATMAPS WHERE BEATMAP_ID=?", (int(map[0]),))
