@@ -11,6 +11,24 @@ api = OsuApi(apicode, connector = ReqConnector())
 playername = "neil123"
 user = api.get_user(playername) 
 
+def compare_maps(a, b):
+	affinity = 0
+	ID1 = a.split(" ")[0]
+	ID2 = b.split(" ")[0]
+	if ID1 != ID2:
+		return 0
+	if "NoMod" in a and "NoMod" in b:
+		return 3
+	if "Hidden" in a and "Hidden" in b:
+		affinity += 1
+	if "HardRock" in a and "HardRock" in b:
+		affinity += 1
+	if "DoubleTime" in a or "Nightcore" in a and "DoubleTime" in b or "Nightcore" in b:
+		affinity += 1
+	return affinity
+	
+
+
 conn = sqlite3.connect('osu.db')
 c = conn.cursor()
 
@@ -53,13 +71,31 @@ for player in similar_users:
 		#print("something broke")
 	conn.commit()
 
-results = api.get_user_best( playername, limit=25)
+results = api.get_user_best(playername, limit=25)
 userscores = []
-for x in results:		
-	userscores.append(str(x.beatmap_id) + " " + str(x.enabled_mods))		
+for x in results:
+	score = str(x.beatmap_id) + " " + str(x.enabled_mods)
+	userscores.append(score)	
+
+bestfriends = []
+affinities = {}
+for similar_user in similar_users:
+	cp = c.execute("SELECT * FROM PLAYERS WHERE PLAYER_ID=?",(similar_user,))
+	playerscores = cp.fetchone()
+	total_affinity = 0
+	for i in range(1,26):
+		for j in range(25):
+			affinity = compare_maps(playerscores[i],userscores[j])
+			total_affinity += affinity
+	affinities[similar_user] = total_affinity
+for key in sorted(affinities, key=affinities.__getitem__, reverse = True):
+	bestfriends.append(key)
+print(bestfriends)
+
+
 
 #crates best frands
-playerscore = {}
+"""playerscore = {}
 counts = {}
 for x in userscores:
 	playerscore[x] = 1
@@ -79,7 +115,7 @@ bestfrands=[]
 for key in sorted(counts,key=counts.__getitem__,reverse=True):
 	bestfrands.append(key)
 bestfrands = bestfrands[0:25]
-print(bestfrands)
+print(bestfrands)"""
 
 #gets most uncommon maps
 dict1={}
