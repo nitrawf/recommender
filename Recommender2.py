@@ -8,7 +8,7 @@ with open("apicode.json") as apc:
 	apicode = json.load(apc)[0]["apicode"]
 
 api = OsuApi(apicode, connector = ReqConnector())
-playername = "neil123"
+playername = "Xav"
 user = api.get_user(playername) 
 
 def compare_maps(a, b):
@@ -18,7 +18,7 @@ def compare_maps(a, b):
 	if ID1 != ID2:
 		return 0
 	if "NoMod" in a and "NoMod" in b:
-		return 3
+		return 2
 	if "Hidden" in a and "Hidden" in b:
 		affinity += 1
 	if "HardRock" in a and "HardRock" in b:
@@ -26,7 +26,20 @@ def compare_maps(a, b):
 	if "DoubleTime" in a or "Nightcore" in a and "DoubleTime" in b or "Nightcore" in b:
 		affinity += 1
 	return affinity
-	
+
+def mod_finder(score, counter):
+	ID = score.split(" ")[0]
+	if "NoMod" in score:
+		counter[ID]["NoMod"] += 1
+	if "HardRock" in score:
+		counter[ID]["HardRock"] += 1
+	if "DoubleTime" in score or "Nightcore" in score:
+		counter[ID]["DoubleTime"] += 1
+
+def findmaxmod(ID, counter):
+	v = list(counter[ID].values())
+	k = list(counter[ID].keys())
+	return k[v.index(max(v))]
 
 
 conn = sqlite3.connect('osu.db')
@@ -42,7 +55,7 @@ for player in playerdb:
 	player_pp = int(player["pp"].replace(",",""))
 	if (player_pp - user_pp <= 500 and player_pp - user_pp >= 0) or (user_pp - player_pp >= 200 and user_pp - player_pp >= 0):
 		similar_users.append(player["user_id"])
-	if len(similar_users) >= 50:
+	if len(similar_users) >= 250:
 		break
 
 
@@ -68,7 +81,6 @@ for player in similar_users:
 		for x in results:
 			scores.append(str(x.beatmap_id) + " " + str(x.enabled_mods))
 		c.execute("INSERT INTO PLAYERS VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", tuple(scores))
-		#print("something broke")
 	conn.commit()
 
 results = api.get_user_best(playername, limit=25)
@@ -90,55 +102,30 @@ for similar_user in similar_users:
 	affinities[similar_user] = total_affinity
 for key in sorted(affinities, key=affinities.__getitem__, reverse = True):
 	bestfriends.append(key)
-print(bestfriends)
-
-
-
-#crates best frands
-"""playerscore = {}
-counts = {}
-for x in userscores:
-	playerscore[x] = 1
-for x in similar_users:
-	temp = playerscore.copy()
-	cp = c.execute("SELECT * FROM PLAYERS WHERE PLAYER_ID=?",(x,))
-	data = cp.fetchone()
-	count = 0
-	try:
-		for y in data:
-			if y in temp:
-				count += 1
-	except:
-		print("something broke v2")
-	counts[x] = count
-bestfrands=[]
-for key in sorted(counts,key=counts.__getitem__,reverse=True):
-	bestfrands.append(key)
-bestfrands = bestfrands[0:25]
-print(bestfrands)"""
+bestfriends = bestfriends[:25]
 
 #gets most uncommon maps
-dict1={}
-for x in bestfrands:
-	cp = c.execute("SELECT * FROM PLAYERS WHERE PLAYER_ID=?",(x,))
-	data = cp.fetchone()
-	try:
-		for y in data:
-			if y in dict1:
-				dict1[y] += 1
-			else:
-				dict1[y] = 1 
-	except:
-		print("something broke v3")
+mapcounts = {}
+modcounter = {}
+for bestfriend in bestfriends:
+	cp = c.execute("SELECT * FROM PLAYERS WHERE PLAYER_ID=?",(bestfriend,))
+	playerscores = cp.fetchone()
+	for i in range(1,26):
+		if playerscores[i].split(" ")[0] in mapcounts:
+			mapcounts[playerscores[i].split(" ")[0]] += 1
+		else:
+			mapcounts[playerscores[i].split(" ")[0]] = 1
+			modcounter[playerscores[i].split(" ")[0]] = {"NoMod" : 0, "HardRock" : 0, "DoubleTime" : 0}
+		mod_finder(playerscores[i], modcounter) 		 
 	dump = []
-for x in sorted(dict1, key=dict1.__getitem__):
+for x in sorted(mapcounts, key=mapcounts.__getitem__):
 	dump.append(x)
 
 
 #get map details
 filename=playername+"_"+str(datetime.date.today())
 fw=open("Users\\"+filename+".txt","w")
-for i in range(25):
+for i in range(100):
 	c.execute("CREATE TABLE IF NOT EXISTS BEATMAPS(BEATMAP_ID INTEGER,TITLE TEXT,LINK TEXT,CREATOR TEXT)")
 	try:
 		map = dump[i].split(" ")
@@ -154,7 +141,8 @@ for i in range(25):
 		c.execute("INSERT INTO BEATMAPS VALUES(?,?,?,?)", (int(map[0]),result[0].title,link,result[0].creator))		
 	c.execute("SELECT * FROM BEATMAPS WHERE BEATMAP_ID=?", (int(map[0]),))
 	data = c.fetchone()
-	outstring=data[1] + "\t" + map[1] + "\t"
+	mod = findmaxmod(map[0], modcounter)
+	outstring=data[1] + "\t" + mod + "\t"
 	if len(map) == 3:
 		outstring += map[2]+"\t"
 	outstring += data[3] + "\t" + data[2]
