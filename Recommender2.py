@@ -8,7 +8,7 @@ with open("apicode.json") as apc:
 	apicode = json.load(apc)[0]["apicode"]
 
 api = OsuApi(apicode, connector = ReqConnector())
-playername = "neil123"
+playername = "potla"
 user = api.get_user(playername) 
 
 def compare_maps(a, b):
@@ -45,17 +45,17 @@ def findmaxmod(ID, counter):
 conn = sqlite3.connect('osu.db')
 c = conn.cursor()
 
-with open("player_records.json") as fr:
+with open("updated_player_records.json") as fr:
 	playerdb = json.load(fr)
 
 
-user_pp = user[0].pp_raw
+user_rank = user[0].pp_rank
 similar_users = []
 for player in playerdb:
-	player_pp = int(player["pp"].replace(",",""))
-	if (player_pp - user_pp <= 500 and player_pp - user_pp >= 0) or (user_pp - player_pp >= 200 and user_pp - player_pp >= 0):
+	player_rank = int(player["global_rank"])
+	if (player_rank - user_rank <= 800 and player_rank - user_rank >= 0) or (user_rank - player_rank >= 200 and user_rank - player_rank >= 0):
 		similar_users.append(player["user_id"])
-	if len(similar_users) >= 250:
+	if len(similar_users) >= 950:
 		break
 
 
@@ -80,7 +80,10 @@ for player in similar_users:
 		scores = [player]
 		for x in results:
 			scores.append(str(x.beatmap_id) + " " + str(x.enabled_mods))
-		c.execute("INSERT INTO PLAYERS VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", tuple(scores))
+		try:
+			c.execute("INSERT INTO PLAYERS VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", tuple(scores))
+		except:
+			pass
 	conn.commit()
 
 results = api.get_user_best(playername, limit=25)
@@ -97,6 +100,8 @@ for similar_user in similar_users:
 	cp = c.execute("SELECT * FROM PLAYERS WHERE PLAYER_ID=?",(similar_user,))
 	playerscores = cp.fetchone()
 	total_affinity = 0
+	if playerscores is None:
+		continue
 	for i in range(1,26):
 		for j in range(25):
 			affinity = compare_maps(playerscores[i],userscores[j])
@@ -104,7 +109,7 @@ for similar_user in similar_users:
 	affinities[similar_user] = total_affinity
 for key in sorted(affinities, key=affinities.__getitem__, reverse = True):
 	bestfriends.append(key)
-bestfriends = bestfriends[:25]
+bestfriends = bestfriends[:10]
 
 #gets most uncommon maps
 mapcounts = {}
@@ -120,7 +125,7 @@ for bestfriend in bestfriends:
 			modcounter[playerscores[i].split(" ")[0]] = {"NoMod" : 0, "HardRock" : 0, "DoubleTime" : 0}
 		mod_finder(playerscores[i], modcounter) 		 
 dump = []
-for x in sorted(mapcounts, key=mapcounts.__getitem__, reverse = True):
+for x in sorted(mapcounts, key=mapcounts.__getitem__):
 	dump.append(x)
 
 
@@ -128,7 +133,7 @@ for x in sorted(mapcounts, key=mapcounts.__getitem__, reverse = True):
 filename=playername+"_"+str(datetime.date.today())
 fw=open("Users\\"+filename+".txt","w")
 for i in range(100):
-	c.execute("CREATE TABLE IF NOT EXISTS BEATMAPS(BEATMAP_ID INTEGER,TITLE TEXT,LINK TEXT,CREATOR TEXT)")
+	c.execute("CREATE TABLE IF NOT EXISTS BEATMAPS(BEATMAP_ID INTEGER, TITLE TEXT, LINK TEXT, CREATOR TEXT, BPM REAL, SR REAL, LENGTH INTEGER, DIFFICULTY TEXT)")
 	try:
 		map = dump[i].split(" ")
 		if map[0] in scoreidonly:
@@ -142,13 +147,11 @@ for i in range(100):
 		if len(result) == 0:
 			continue
 		link = ("https://osu.ppy.sh/b/"+str(map[0]) + "?m=0")
-		c.execute("INSERT INTO BEATMAPS VALUES(?,?,?,?)", (int(map[0]),result[0].title,link,result[0].creator))		
+		c.execute("INSERT INTO BEATMAPS VALUES(?,?,?,?,?,?,?,?)", (int(map[0]), result[0].title, link,result[0].creator, result[0].bpm, result[0].difficultyrating, result[0].total_length, result[0].version))		
 	c.execute("SELECT * FROM BEATMAPS WHERE BEATMAP_ID=?", (int(map[0]),))
 	data = c.fetchone()
 	mod = findmaxmod(map[0], modcounter)
-	outstring=data[1] + "\t" + mod + "\t"
-	if len(map) == 3:
-		outstring += map[2]+"\t"
+	outstring=data[1] + "\t" + data[7] + "\t" + mod + "\t" + "SR: " + str(data[5])[:3] + " BPM: " + str(data[4]) + " Length: " + str(data[6])+ " "
 	outstring += data[3] + "\t" + data[2]
 	fw.write(outstring)
 	fw.write("\n")
